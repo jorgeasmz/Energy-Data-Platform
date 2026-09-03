@@ -95,3 +95,4 @@ def test_an_empty_partition_is_still_recorded(connection):
     # A month the source has nothing for is a fact worth keeping: without the row
     # a backfill would ask for it again on every run.
     assert (MONTH, 0) in coverage(connection, SERIES.key)
+
