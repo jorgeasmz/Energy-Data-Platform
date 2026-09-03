@@ -42,6 +42,14 @@ jobs:
       - name: Lint
         run: ruff check .
 
+      # The asset graph reads the dbt manifest when it is imported, and the
+      # manifest is a build artefact rather than a file in the repository. Parsing
+      # needs the project and its packages, not a database.
+      - name: Parse the dbt project
+        run: |
+          dbt deps --project-dir warehouse
+          dbt parse --project-dir warehouse
+
       - name: Unit tests
         run: pytest
 
@@ -56,6 +64,4 @@ jobs:
           psql "$WAREHOUSE_URL" -f tests/fixtures/raw_sample.sql
 
       - name: Build the warehouse
-        run: |
-          dbt deps --project-dir warehouse
-          dbt build --project-dir warehouse
+        run: dbt build --project-dir warehouse
