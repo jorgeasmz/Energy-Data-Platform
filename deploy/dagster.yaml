@@ -1,0 +1,16 @@
+# Runs execute in ephemeral GitHub Actions containers while the UI runs on a
+# separate instance, so the history has to live somewhere both can reach. Without
+# this the deployed UI would show an empty run list.
+storage:
+  postgres:
+    postgres_url:
+      env: DAGSTER_PG_URL
+
+telemetry:
+  enabled: false
+
+# The webserver serves; it does not launch runs. Anything started from the UI
+# would die with the request that started it.
+run_launcher:
+  module: dagster._core.launcher
+  class: DefaultRunLauncher

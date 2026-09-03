@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: energy-data-platform
+    runtime: python
+    plan: free
+    # The asset graph reads the dbt manifest on import, and the manifest is a
+    # build artefact. Parsing needs the project and its packages, not a database.
+    buildCommand: |
+      pip install -r requirements-dev.txt
+      dbt deps --project-dir warehouse
+      dbt parse --project-dir warehouse
+    startCommand: dagster-webserver -m pipeline.definitions -h 0.0.0.0 -p $PORT
+    healthCheckPath: /server_info
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: DAGSTER_HOME
+        value: /opt/render/project/src/deploy
+      - key: DBT_PROFILES_DIR
+        value: warehouse
+      - key: PYTHONPATH
+        value: .
+      # The warehouse, and Dagster's own history, both live in Neon.
+      - key: DAGSTER_PG_URL
+        sync: false
+      - key: WAREHOUSE_HOST
+        sync: false
+      - key: WAREHOUSE_USER
+        sync: false
+      - key: WAREHOUSE_PASSWORD
+        sync: false
+      - key: WAREHOUSE_DB
+        sync: false
+      - key: WAREHOUSE_PORT
+        value: "5432"
+      - key: WAREHOUSE_SSLMODE
+        value: require
