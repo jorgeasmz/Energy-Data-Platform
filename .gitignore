@@ -1,0 +1,18 @@
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+.env
+
+# dbt build artefacts
+warehouse/target/
+warehouse/dbt_packages/
+warehouse/logs/
+
+# Dagster local state
+.dagster_home/
+
+# dbt writes an anonymous usage id here
+warehouse/.user.yml

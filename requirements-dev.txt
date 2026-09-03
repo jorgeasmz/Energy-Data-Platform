@@ -1,0 +1,10 @@
+-r requirements.txt
+dbt-core==1.12.3
+dbt-postgres==1.11.0
+dagster==1.13.21
+dagster-dbt==0.29.21
+dagster-webserver==1.13.21
+dagster-postgres==0.29.21
+pytest==8.4.2
+pytest-cov==7.0.0
+ruff==0.14.4

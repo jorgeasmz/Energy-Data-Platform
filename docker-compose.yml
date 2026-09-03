@@ -1,0 +1,15 @@
+services:
+  warehouse:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: energy
+      POSTGRES_PASSWORD: energy
+      POSTGRES_DB: energy
+    ports:
+      - "5435:5432"
+    volumes:
+      # Postgres 18 places its data in a subdirectory of this mount.
+      - warehouse:/var/lib/postgresql
+
+volumes:
+  warehouse:
