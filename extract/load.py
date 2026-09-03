@@ -20,9 +20,24 @@ from extract.xm import Record, month_bounds
 
 log = logging.getLogger(__name__)
 
-DATABASE_URL = os.getenv(
-    "WAREHOUSE_URL", "postgresql://energy:energy@localhost:5435/energy"
-)
+def warehouse_url() -> str:
+    """One connection described one way.
+
+    dbt needs the parts separately, so those are the variables of record and the
+    loader assembles them. WAREHOUSE_URL overrides for the cases where a whole
+    URL is what is at hand, such as a test run.
+    """
+    override = os.getenv("WAREHOUSE_URL")
+    if override:
+        return override
+
+    user = os.getenv("WAREHOUSE_USER", "energy")
+    password = os.getenv("WAREHOUSE_PASSWORD", "energy")
+    host = os.getenv("WAREHOUSE_HOST", "localhost")
+    port = os.getenv("WAREHOUSE_PORT", "5435")
+    database = os.getenv("WAREHOUSE_DB", "energy")
+    sslmode = os.getenv("WAREHOUSE_SSLMODE", "prefer")
+    return f"postgresql://{user}:{password}@{host}:{port}/{database}?sslmode={sslmode}"
 
 SCHEMA_SQL = Path(__file__).resolve().parent.parent / "warehouse" / "sql" / "raw_schema.sql"
 
@@ -43,8 +58,8 @@ DO UPDATE SET rows_loaded = EXCLUDED.rows_loaded,
 """
 
 
-def connect(url: str = DATABASE_URL) -> psycopg.Connection:
-    return psycopg.connect(url)
+def connect(url: str | None = None) -> psycopg.Connection:
+    return psycopg.connect(url or warehouse_url())
 
 
 def ensure_schema(connection: psycopg.Connection) -> None:
