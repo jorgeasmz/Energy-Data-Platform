@@ -1,5 +1,7 @@
 -r requirements.txt
-dbt-core==1.12.3
+# dagster-dbt pins dbt-core below 1.12, so the warehouse and the orchestrator
+# agree on 1.11 rather than each claiming a version the other refuses.
+dbt-core==1.11.14
 dbt-postgres==1.11.0
 dagster==1.13.21
 dagster-dbt==0.29.21

@@ -137,10 +137,17 @@ dagster dev -m pipeline.definitions
 ## Development
 
 ```bash
+dbt deps --project-dir warehouse
+dbt parse --project-dir warehouse   # the asset graph reads the manifest on import
+
 pytest                    # 19 tests, offline
 pytest -m postgres        # 5 more, against a live warehouse
 ruff check .
 ```
+
+The manifest is a build artefact, not a file in the repository, and `pipeline.assets`
+reads it when it is imported. Parsing needs the project and its packages but no
+database, which is why it comes before the tests rather than with the build.
 
 No test in the default run reaches the API or a database. The client is driven by
 a fake session that returns what the real one returns, including the case the API

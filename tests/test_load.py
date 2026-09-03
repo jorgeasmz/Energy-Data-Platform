@@ -14,10 +14,11 @@ pytestmark = pytest.mark.postgres
 
 SERIES = BY_KEY["precbolsnaci__sistema"]
 
-# A month the real loader never touches, so the assertions count only what the
-# test wrote even when the warehouse already holds a backfill.
-MONTH = date(2024, 3, 1)
-NEXT_MONTH = date(2024, 4, 1)
+# A month nothing else writes: not the loader, whose windows begin later, and not
+# the CI fixture, which uses 2024-03. The assertions then count only what the test
+# put there, whatever else the warehouse holds.
+MONTH = date(2019, 7, 1)
+NEXT_MONTH = date(2019, 8, 1)
 
 
 def record(day: int, value: str = "10.5") -> Record:
@@ -25,7 +26,7 @@ def record(day: int, value: str = "10.5") -> Record:
         metric_id=SERIES.metric_id,
         entity=SERIES.entity,
         resource_code="Sistema",
-        tx_date=date(2024, 3, day),
+        tx_date=MONTH.replace(day=day),
         values={"Hour01": value, "Hour02": "11.0"},
     )
 
