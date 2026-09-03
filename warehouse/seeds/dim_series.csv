@@ -1,0 +1,7 @@
+metric_id,entity,metric_name,grain
+PrecBolsNaci,Sistema,Precio Bolsa Nacional por Sistema,system
+DemaReal,Sistema,Demanda Real por Sistema,system
+DemaCome,Sistema,Demanda Comercial por Sistema,system
+Gene,Sistema,Generación por Sistema,system
+PrecOferDesp,Recurso,Precio de Oferta de Despacho por Recurso,resource
+EmisionesCO2Eq,Recurso,Emisiones de CO2 Eq por Recurso,resource

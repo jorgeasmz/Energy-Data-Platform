@@ -1,0 +1,15 @@
+# Kept in the project rather than in ~/.dbt, so a run in CI or in a container
+# needs no file placed by hand. The connection itself comes from the environment.
+energy:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('WAREHOUSE_HOST', 'localhost') }}"
+      port: "{{ env_var('WAREHOUSE_PORT', '5435') | int }}"
+      user: "{{ env_var('WAREHOUSE_USER', 'energy') }}"
+      password: "{{ env_var('WAREHOUSE_PASSWORD', 'energy') }}"
+      dbname: "{{ env_var('WAREHOUSE_DB', 'energy') }}"
+      schema: public
+      threads: 4
+      sslmode: "{{ env_var('WAREHOUSE_SSLMODE', 'prefer') }}"

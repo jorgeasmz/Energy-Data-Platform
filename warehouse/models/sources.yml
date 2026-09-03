@@ -1,0 +1,33 @@
+version: 2
+
+sources:
+  - name: xm
+    schema: raw
+    description: >
+      What the XM hourly API returned, stored without reshaping. The twenty four
+      hours arrive packed in one JSON object, which is why every model downstream
+      begins by unpivoting.
+    tables:
+      - name: xm_hourly
+        loaded_at_field: loaded_at
+        freshness:
+          # The market publishes the previous day, so a warehouse more than two
+          # days behind has stopped being loaded rather than merely lagging.
+          warn_after: {count: 36, period: hour}
+          error_after: {count: 72, period: hour}
+        columns:
+          - name: metric_id
+            data_tests: [not_null]
+          - name: entity
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ["Sistema", "Recurso"]
+          - name: tx_date
+            data_tests: [not_null]
+          - name: hour_values
+            data_tests: [not_null]
+
+      - name: load_audit
+        description: One row per series and partition, written by the loader.

@@ -1,0 +1,24 @@
+name: energy
+version: "1.0.0"
+profile: energy
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  energy:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      # The marts are read by a dashboard and by another project, so they are
+      # tables rather than views: the cost is paid once per run, not per query.
+      +materialized: table
+      +schema: marts
+
+seeds:
+  energy:
+    +schema: marts

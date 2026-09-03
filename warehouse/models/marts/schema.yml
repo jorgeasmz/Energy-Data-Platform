@@ -1,0 +1,97 @@
+version: 2
+
+models:
+  - name: fct_system_hourly
+    description: >
+      The market as a whole, one row an hour. A contract is enforced because
+      another project reads this table directly, so a column that changes type or
+      disappears has to fail the build here rather than break a consumer.
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: measured_at
+        data_type: timestamp
+        constraints: [{type: not_null}]
+        data_tests: [unique]
+      - name: market_date
+        data_type: date
+        constraints: [{type: not_null}]
+      - name: hour_of_day
+        data_type: integer
+        constraints: [{type: not_null}]
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 1, max_value: 24, inclusive: true}
+      - name: spot_price
+        description: Price of the national spot market for the hour.
+        data_type: numeric
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 0, inclusive: true}
+      - name: real_demand
+        data_type: numeric
+      - name: commercial_demand
+        data_type: numeric
+      - name: generation
+        data_type: numeric
+
+  - name: fct_resource_hourly
+    description: One row per generating plant an hour.
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: measured_at
+        data_type: timestamp
+        constraints: [{type: not_null}]
+      - name: market_date
+        data_type: date
+        constraints: [{type: not_null}]
+      - name: hour_of_day
+        data_type: integer
+        constraints: [{type: not_null}]
+      - name: resource_code
+        data_type: text
+        constraints: [{type: not_null}]
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_resource')
+                field: resource_code
+      - name: offer_price
+        data_type: numeric
+      - name: co2_equivalent
+        data_type: numeric
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [measured_at, resource_code]
+
+  - name: dim_resource
+    description: Every plant the resource level facts mention, and its span.
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: resource_code
+        data_type: text
+        constraints: [{type: not_null}]
+        data_tests: [unique]
+      - name: first_seen
+        data_type: date
+        constraints: [{type: not_null}]
+      - name: last_seen
+        data_type: date
+        constraints: [{type: not_null}]
+      - name: days_present
+        data_type: integer
+        constraints: [{type: not_null}]
+
+seeds:
+  - name: dim_series
+    description: The catalogue of series, with the names the API itself reports.
+    columns:
+      - name: metric_id
+        data_tests: [not_null, unique]
+      - name: grain
+        data_tests:
+          - accepted_values:
+              arguments: {values: ["system", "resource"]}
