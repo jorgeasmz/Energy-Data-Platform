@@ -1,0 +1,73 @@
+name: Load
+
+on:
+  schedule:
+    # Dagster's daemon needs a process that runs continuously, which the free
+    # tier does not offer, so the schedule lives here and calls the same assets.
+    - cron: "20 11 * * *"
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "First month to load, YYYY-MM. Defaults to the current one."
+        required: false
+      end:
+        description: "Last month to load, YYYY-MM. Defaults to the current one."
+        required: false
+
+concurrency:
+  # Two runs writing the same partitions would only repeat each other's work.
+  group: load
+  cancel-in-progress: false
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+
+    env:
+      DBT_PROFILES_DIR: warehouse
+      PYTHONPATH: .
+      DAGSTER_HOME: ${{ github.workspace }}/deploy
+      DAGSTER_PG_URL: ${{ secrets.DAGSTER_PG_URL }}
+      WAREHOUSE_URL: ${{ secrets.WAREHOUSE_URL }}
+      WAREHOUSE_HOST: ${{ secrets.WAREHOUSE_HOST }}
+      WAREHOUSE_USER: ${{ secrets.WAREHOUSE_USER }}
+      WAREHOUSE_PASSWORD: ${{ secrets.WAREHOUSE_PASSWORD }}
+      WAREHOUSE_DB: ${{ secrets.WAREHOUSE_DB }}
+      WAREHOUSE_PORT: "5432"
+      WAREHOUSE_SSLMODE: require
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - run: pip install -r requirements-dev.txt
+
+      - name: Parse the dbt project
+        run: |
+          dbt deps --project-dir warehouse
+          dbt parse --project-dir warehouse
+
+      # The current month is reloaded every day. The partition is monthly because
+      # that is what one request covers, and the upsert makes a repeat free of
+      # consequence, so the month fills in as its days are published.
+      - name: Load
+        env:
+          START: ${{ inputs.start }}
+          END: ${{ inputs.end }}
+        run: |
+          MONTH=$(date -u +%Y-%m)
+          if [ -z "$START" ] && [ -z "$END" ]; then
+            # The scheduled case: refetch the month in progress so the days
+            # published since yesterday land. The upsert makes that free.
+            python -m extract.backfill --start "$MONTH" --end "$MONTH" --force
+          else
+            # A backfill asked for by hand resumes rather than repeats.
+            python -m extract.backfill --start "${START:-$MONTH}" --end "${END:-$MONTH}"
+          fi
+
+      - name: Build the warehouse
+        run: dbt build --project-dir warehouse
