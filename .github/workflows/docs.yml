@@ -1,0 +1,67 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "warehouse/**"
+      - ".github/workflows/docs.yml"
+  schedule:
+    # The catalogue carries row counts and column types, which drift with the data.
+    - cron: "40 12 * * 1"
+  workflow_dispatch:
+
+# The generated site is one self contained file, so publishing is a copy. Building
+# it is not: the catalogue is read from the warehouse, which is why this runs here
+# rather than on the host that serves it.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    env:
+      DBT_PROFILES_DIR: warehouse
+      WAREHOUSE_HOST: ${{ secrets.WAREHOUSE_HOST }}
+      WAREHOUSE_USER: ${{ secrets.WAREHOUSE_USER }}
+      WAREHOUSE_PASSWORD: ${{ secrets.WAREHOUSE_PASSWORD }}
+      WAREHOUSE_DB: ${{ secrets.WAREHOUSE_DB }}
+      WAREHOUSE_PORT: "5432"
+      WAREHOUSE_SSLMODE: require
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - run: pip install -r requirements-dev.txt
+
+      - name: Generate
+        run: |
+          dbt deps --project-dir warehouse
+          dbt docs generate --static --project-dir warehouse
+
+      - name: Collect
+        run: |
+          mkdir -p site
+          cp warehouse/target/static_index.html site/index.html
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

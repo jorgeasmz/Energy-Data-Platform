@@ -111,6 +111,13 @@ Dagster's daemon needs a process that runs continuously, and the free tier this 
 deployed on offers none, so the schedule lives in GitHub Actions and invokes the
 same assets. The code does not know the difference.
 
+## Documentation
+
+`dbt docs generate --static` produces one self contained file carrying the lineage
+graph, every column, every test and the contracts. Building it reads the catalogue
+from the warehouse, so it is generated in CI and published as a static page rather
+than served by anything.
+
 ## Running it
 
 ```bash
