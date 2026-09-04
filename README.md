@@ -157,13 +157,32 @@ export DAGSTER_HOME=$PWD/.dagster_home PYTHONPATH=.
 dagster dev -m pipeline.definitions
 ```
 
+## Deployment
+
+| Component | Host | |
+|---|---|---|
+| Warehouse | Neon, PostgreSQL | |
+| Asset graph | Render | [energy-data-platform-3aqa.onrender.com](https://energy-data-platform-3aqa.onrender.com) |
+| Lineage and columns | GitHub Pages | [jorgeasmz.github.io/Energy-Data-Platform](https://jorgeasmz.github.io/Energy-Data-Platform/) |
+| Schedule | GitHub Actions | Daily, one partition per series |
+
+The webserver holds 353 MB of the 512 the plan allows. Its run history lives in the
+same database as the warehouse rather than on disk, since the plan offers no disk
+that survives a restart, and a graph that forgot every run after each deploy would
+show nothing.
+
+The connection is configured in parts rather than as one string, since dbt reads
+the parts separately. Those are the variables of record and the loader assembles a
+URL from them, so both halves of the pipeline are pointed at one database by one
+set of settings.
+
 ## Development
 
 ```bash
 dbt deps --project-dir warehouse
 dbt parse --project-dir warehouse   # the asset graph reads the manifest on import
 
-pytest                    # 19 tests, offline
+pytest                    # 26 tests, offline
 pytest -m postgres        # 5 more, against a live warehouse
 ruff check .
 ```
