@@ -50,23 +50,35 @@ jobs:
           dbt deps --project-dir warehouse
           dbt parse --project-dir warehouse
 
-      # The current month is reloaded every day. The partition is monthly because
-      # that is what one request covers, and the upsert makes a repeat free of
-      # consequence, so the month fills in as its days are published.
-      - name: Load
+      # The month in progress is materialised every day, one partition per series.
+      # Going through Dagster rather than calling the loader is what puts the run
+      # in the history the deployed graph shows: a pipeline that bypassed its own
+      # orchestrator would leave that page permanently empty.
+      - name: Materialise the month in progress
+        if: ${{ !inputs.start && !inputs.end }}
+        run: |
+          MONTH=$(date -u +%Y-%m-01)
+          for KEY in $(python -c "from extract.config import SERIES; print(' '.join(s.key for s in SERIES))"); do
+            echo "::group::$KEY"
+            dagster asset materialize -m pipeline.definitions \
+              --select "xm/xm_hourly" --partition "$MONTH|$KEY"
+            echo "::endgroup::"
+          done
+
+      # A range asked for by hand is hundreds of partitions, and a Dagster process
+      # per partition would spend longer starting than fetching. The loader does
+      # the work and the events are reported afterwards, so the graph still knows.
+      - name: Backfill a range
+        if: ${{ inputs.start || inputs.end }}
         env:
           START: ${{ inputs.start }}
           END: ${{ inputs.end }}
         run: |
           MONTH=$(date -u +%Y-%m)
-          if [ -z "$START" ] && [ -z "$END" ]; then
-            # The scheduled case: refetch the month in progress so the days
-            # published since yesterday land. The upsert makes that free.
-            python -m extract.backfill --start "$MONTH" --end "$MONTH" --force
-          else
-            # A backfill asked for by hand resumes rather than repeats.
-            python -m extract.backfill --start "${START:-$MONTH}" --end "${END:-$MONTH}"
-          fi
+          python -m extract.backfill --start "${START:-$MONTH}" --end "${END:-$MONTH}"
+          python -m pipeline.reconcile
 
       - name: Build the warehouse
-        run: dbt build --project-dir warehouse
+        run: |
+          dagster asset materialize -m pipeline.definitions \
+            --select "staging/stg_xm_hourly+"
