@@ -6,6 +6,11 @@ models:
       The market as a whole, one row an hour. A contract is enforced because
       another project reads this table directly, so a column that changes type or
       disappears has to fail the build here rather than break a consumer.
+
+      The measurements are declared as numeric without a precision, which dbt
+      warns about because on some warehouses that rounds. On PostgreSQL it is
+      arbitrary precision and stores what arrived, and a declared scale would be
+      the thing that rounds if the source ever published another decimal.
     config:
       contract: {enforced: true}
     columns:

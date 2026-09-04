@@ -127,6 +127,22 @@ dbt build --project-dir warehouse
 Three months of the six series is 12,858 raw rows and 8.7 MB, which becomes 2,208
 hourly rows for the market and 250,584 for its plants.
 
+The deployed warehouse holds the system series from 2016 and the resource series
+from 2024, which is what the free tier the database runs on allows:
+
+| | |
+|---|---:|
+| Database | 264 MB of 512 |
+| Hours of the market | 93,504 |
+| Rows per plant and hour | 2,601,552 |
+| Plants | 135 |
+| Range | 2016-01-01 to 2026-08-31 |
+
+That window was chosen from a measurement rather than a guess. Three months of
+every series cost 8 MB, almost all of it the resource grain, and the resource
+series are what set the limit: a month of them is fifty times a month of the
+system ones. The system history is a decade for 4 MB.
+
 For the asset graph and the state of every partition:
 
 ```bash
