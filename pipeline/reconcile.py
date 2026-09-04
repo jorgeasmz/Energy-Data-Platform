@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from datetime import date
 
 import dagster as dg
 from dagster import DagsterInstance
@@ -24,30 +25,44 @@ from pipeline.assets import ASSET_KEY
 log = logging.getLogger(__name__)
 
 
-def report(instance: DagsterInstance, dry_run: bool = False) -> int:
+def loaded_partitions() -> list[tuple[str, date, int]]:
+    """Everything the audit table holds, read and released in one go.
+
+    Reporting each event to Dagster is a network write, and holding a warehouse
+    connection open across hundreds of them leaves it idle inside a transaction,
+    which a managed PostgreSQL terminates.
+    """
     connection = connect()
-    reported = 0
+    connection.autocommit = True
     try:
-        for series in SERIES:
-            for partition, rows in coverage(connection, series.key):
-                key = dg.MultiPartitionKey(
-                    {"month": partition.strftime("%Y-%m-%d"), "series": series.key}
-                )
-                if not dry_run:
-                    instance.report_runless_asset_event(
-                        dg.AssetMaterialization(
-                            asset_key=ASSET_KEY,
-                            partition=key,
-                            description="Loaded before the asset graph was watching.",
-                            metadata={"rows": rows, "reconciled": True},
-                        )
-                    )
-                reported += 1
+        return [
+            (series.key, partition, rows)
+            for series in SERIES
+            for partition, rows in coverage(connection, series.key)
+        ]
     finally:
         connection.close()
 
-    log.info("%s %d partitions", "would report" if dry_run else "reported", reported)
-    return reported
+
+def report(instance: DagsterInstance, dry_run: bool = False) -> int:
+    partitions = loaded_partitions()
+
+    for series_key, partition, rows in partitions:
+        if dry_run:
+            continue
+        instance.report_runless_asset_event(
+            dg.AssetMaterialization(
+                asset_key=ASSET_KEY,
+                partition=dg.MultiPartitionKey(
+                    {"month": partition.strftime("%Y-%m-%d"), "series": series_key}
+                ),
+                description="Loaded before the asset graph was watching.",
+                metadata={"rows": rows, "reconciled": True},
+            )
+        )
+
+    log.info("%s %d partitions", "would report" if dry_run else "reported", len(partitions))
+    return len(partitions)
 
 
 def main() -> None:
