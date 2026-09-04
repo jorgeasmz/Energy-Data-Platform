@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
+import requests
 
 from extract.config import MAX_SPAN_DAYS, SERIES, Series
 from extract.xm import SourceError, fetch_month, month_bounds, parse
@@ -115,3 +116,38 @@ def test_every_configured_series_has_its_own_key():
     keys = [series.key for series in SERIES]
 
     assert len(keys) == len(set(keys))
+
+
+class ExplodingSession:
+    """A session whose connection fails the first `failures` times."""
+
+    def __init__(self, failures: int, then=None):
+        self.failures = failures
+        self.then = then
+        self.calls = 0
+
+    def post(self, url, json, timeout):
+        self.calls += 1
+        if self.calls <= self.failures:
+            raise requests.ReadTimeout("Read timed out.")
+        return self.then
+
+
+def test_a_network_timeout_is_retried(monkeypatch):
+    monkeypatch.setattr("extract.xm.time.sleep", lambda _: None)
+    session = ExplodingSession(2, then=FakeResponse(payload=payload("2024-03-01")))
+
+    records = fetch_month(SAMPLE, date(2024, 3, 1), session=session)
+
+    assert len(records) == 1
+    assert session.calls == 3
+
+
+def test_a_timeout_that_never_clears_becomes_a_source_error(monkeypatch):
+    monkeypatch.setattr("extract.xm.time.sleep", lambda _: None)
+    session = ExplodingSession(99)
+
+    # It has to be a SourceError, because that is the only failure the backfill
+    # knows to record and step over.
+    with pytest.raises(SourceError, match="Read timed out"):
+        fetch_month(SAMPLE, date(2024, 3, 1), session=session)
