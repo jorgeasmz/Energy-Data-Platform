@@ -14,7 +14,11 @@ from pipeline.resources import dbt_project
 # A calendar month is the largest span the API accepts in one request, so a
 # partition is exactly one call. The series dimension keeps the six loads
 # independent: one failing month does not hold up the others.
-MONTHS = dg.MonthlyPartitionsDefinition(start_date=SYSTEM_START.strftime("%Y-%m-%d"))
+# end_offset=1 includes the month in progress. Without it the newest partition is
+# last month, and a schedule that loads today's data would have nowhere to put it.
+MONTHS = dg.MonthlyPartitionsDefinition(
+    start_date=SYSTEM_START.strftime("%Y-%m-%d"), end_offset=1
+)
 SERIES_KEYS = dg.StaticPartitionsDefinition([series.key for series in SERIES])
 
 LOAD_PARTITIONS = dg.MultiPartitionsDefinition({"month": MONTHS, "series": SERIES_KEYS})
@@ -29,10 +33,13 @@ def covers(series, month: date) -> bool:
     return month >= series.start.replace(day=1)
 
 
+# The key the dbt source resolves to, which is what joins the two halves of the
+# graph into one lineage.
+ASSET_KEY = dg.AssetKey(["xm", "xm_hourly"])
+
+
 @dg.asset(
-    # The key the dbt source resolves to, which is what joins the two halves of
-    # the graph into one lineage.
-    key=["xm", "xm_hourly"],
+    key=ASSET_KEY,
     partitions_def=LOAD_PARTITIONS,
     group_name="extract",
     description="One month of one series, as the API returned it.",
