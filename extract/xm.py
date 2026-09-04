@@ -91,7 +91,19 @@ def fetch_month(series: Series, month: date, session: requests.Session | None = 
     caller = session or requests
 
     for attempt in range(1, MAX_ATTEMPTS + 1):
-        response = caller.post(API_URL, json=body, timeout=REQUEST_TIMEOUT)
+        try:
+            response = caller.post(API_URL, json=body, timeout=REQUEST_TIMEOUT)
+        except requests.RequestException as error:
+            # A read timing out is the same kind of event as a 503: worth another
+            # attempt, and worth reporting as a source failure once attempts run
+            # out, so one bad minute does not end a hundred partition backfill.
+            if attempt == MAX_ATTEMPTS:
+                raise SourceError(f"{series.key} {first}: {error}") from error
+            wait = BACKOFF_SECONDS * attempt
+            log.warning("%s %s: %s, retrying in %.0fs", series.key, first, error, wait)
+            time.sleep(wait)
+            continue
+
         if response.status_code == 200:
             try:
                 payload = response.json()
